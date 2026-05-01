@@ -1,2 +1,4 @@
 data/
 *.h5
+artifacts/processed_friday_balanced.csv
+artifacts/test_set.csv
