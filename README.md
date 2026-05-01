@@ -125,7 +125,12 @@ olarak uretilir.
   - pencere tabanli karar filtresi (opsiyonel)
 
 ### otonom tepki mekanizmasi
-Saldiri tespitinde `block_ip()` fonksiyonu tetiklenir. Bu fonksiyon prototip amacli olarak dummy bloklama uygular ve dashboard loglarina yazar. Gercek sistem entegrasyonunda bu katman firewall API/SDN kontrolcusu ile baglanabilir.
+Saldiri tespitinde `block_ip()` fonksiyonu tetiklenir. Dashboard tarafinda iki mod desteklenir:
+
+- `dry-run` (varsayilan, guvenli): gercek bloklama yapmaz, calistirilacak firewall komutunu loglar.
+- gercek komut modu: Windows ortaminda `netsh advfirewall`, Linux ortaminda `iptables` komutunu calistirir.
+
+Bu yaklasim, laboratuvar/sunum ortaminda guvenli test imkani saglarken, ihtiyac halinde gercek firewall otomasyonuna gecisi kolaylastirir.
 
 ---
 
@@ -140,6 +145,7 @@ DerinProje/
 ├─ data_preprocessing.py
 ├─ train_autoencoder.py
 ├─ agent_dashboard.py
+├─ evaluate.py
 └─ README.md
 ```
 
@@ -174,6 +180,16 @@ olusturulur.
 ```bash
 streamlit run agent_dashboard.py
 ```
+
+### 5) otomatik threshold/pencere tuning
+```bash
+python evaluate.py --target-recall 0.80
+```
+
+Bu komut:
+- farkli threshold carpani + pencere kombinasyonlarini tarar,
+- en iyi ayari secer,
+- `artifacts/evaluation_results.csv` ve `artifacts/best_config.json` dosyalarini uretir.
 
 ---
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
+import platform
+import subprocess
 from time import sleep
 from typing import List, Tuple
 
@@ -19,6 +21,42 @@ from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precisio
 
 
 @dataclass
+class FirewallBlocker:
+    """IP bloklama aksiyonunu dry-run veya gercek modda uygular."""
+
+    dry_run: bool = True
+
+    def _build_command(self, ip_address: str) -> List[str]:
+        system_name = platform.system().lower()
+        if "windows" in system_name:
+            return [
+                "netsh",
+                "advfirewall",
+                "firewall",
+                "add",
+                "rule",
+                f"name=cyber-agent-block-{ip_address}",
+                "dir=in",
+                "action=block",
+                f"remoteip={ip_address}",
+            ]
+        return ["iptables", "-A", "INPUT", "-s", ip_address, "-j", "DROP"]
+
+    def block_ip(self, ip_address: str) -> str:
+        command = self._build_command(ip_address)
+        command_str = " ".join(command)
+
+        if self.dry_run:
+            return f"[dry-run] {ip_address} icin komut hazirlandi: {command_str}"
+
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            return f"{ip_address} icin firewall kurali uygulandi."
+        except Exception as exc:
+            return f"{ip_address} icin firewall komutu basarisiz: {exc}"
+
+
+@dataclass
 class CyberSecurityAgent:
     """Model ciktisina gore anomali tespit eder ve dummy bloklama uygular."""
 
@@ -27,6 +65,7 @@ class CyberSecurityAgent:
     min_attack_votes: int = 3
     blocked_ips: List[str] = field(default_factory=list)
     recent_raw_predictions: deque = field(default_factory=deque)
+    blocker: FirewallBlocker = field(default_factory=FirewallBlocker)
 
     def configure_window(self, window_size: int, min_attack_votes: int) -> None:
         self.decision_window_size = max(1, window_size)
@@ -43,7 +82,7 @@ class CyberSecurityAgent:
     def block_ip(self, ip_address: str) -> str:
         if ip_address not in self.blocked_ips:
             self.blocked_ips.append(ip_address)
-        return f"{ip_address} adresi engellendi."
+        return self.blocker.block_ip(ip_address)
 
 
 class AgentDashboard:
@@ -175,10 +214,13 @@ def main() -> None:
         step=1,
     )
     dashboard.agent.configure_window(window_size, min_attack_votes)
+    dry_run_mode = st.sidebar.checkbox("Firewall dry-run modu", value=True)
+    dashboard.agent.blocker = FirewallBlocker(dry_run=dry_run_mode)
     strategy = dashboard.threshold_metadata.get("threshold_strategy", "legacy")
     st.sidebar.caption(
         f"Temel threshold stratejisi: {strategy} | aktif threshold: {dashboard.agent.threshold:.6f}"
     )
+    st.sidebar.caption(f"Firewall modu: {'dry-run' if dry_run_mode else 'gercek komut'}")
 
     if st.sidebar.button("Ajan simulasyonunu baslat"):
         dashboard.run_simulation(max_packets=max_packets, delay_seconds=delay_seconds)
