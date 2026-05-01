@@ -212,23 +212,23 @@ Asagidaki konfigurasyon ile 1000 paketlik test simulasyonunda elde edilen nihai 
 - secili seed: `123`
 - threshold stratejisi: `recall_priority`
 - dashboard ayarlari:
-  - threshold carpani: `1.00`
+  - threshold carpani: `0.95`
   - karar penceresi: `1`
   - pencerede minimum saldiri oyu: `1`
   - maksimum paket: `1000`
   - gecikme: `0.01 sn`
 
 ### performans metrikleri
-- Accuracy: `0.8470`
-- Precision: `0.8535`
-- Recall: `0.8451`
-- F1-Score: `0.8493`
+- Accuracy: `0.8800`
+- Precision: `0.8598`
+- Recall: `0.9137`
+- F1-Score: `0.8859`
 
 ### confusion matrix
-- TN: `416`
-- FP: `74`
-- FN: `79`
-- TP: `431`
+- TN: `414`
+- FP: `76`
+- FN: `44`
+- TP: `466`
 
 Bu sonuc, saldiri yakalama kabiliyeti (recall) ile yanlis alarm kontrolu (precision) arasinda guclu bir denge saglandigini gostermektedir.
 
