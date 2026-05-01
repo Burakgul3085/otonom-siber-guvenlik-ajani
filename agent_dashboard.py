@@ -96,6 +96,10 @@ class AgentDashboard:
         self.threshold, self.threshold_metadata = self._load_threshold()
         self.agent = CyberSecurityAgent(threshold=self.threshold)
         self.test_x, self.test_y = self._load_test_data()
+        self.feature_names = self._load_feature_names(self.test_x.shape[1])
+        self.feature_defaults = np.median(self.test_x, axis=0)
+        feature_std = np.std(self.test_x, axis=0)
+        self.top_feature_indices = np.argsort(feature_std)[::-1][:12]
 
     def _load_threshold(self) -> Tuple[float, dict]:
         threshold_path = self.artifacts_dir / "threshold.json"
@@ -109,6 +113,18 @@ class AgentDashboard:
         y = frame["binary_label"].to_numpy(dtype=np.int32)
         x = frame.drop(columns=["binary_label"]).to_numpy(dtype=np.float32)
         return x, y
+
+    def _load_feature_names(self, expected_count: int) -> List[str]:
+        columns_path = self.artifacts_dir / "feature_columns.json"
+        if columns_path.exists():
+            try:
+                with columns_path.open("r", encoding="utf-8") as file:
+                    names = json.load(file)
+                if isinstance(names, list) and len(names) == expected_count:
+                    return [str(name) for name in names]
+            except Exception:
+                pass
+        return [f"ozellik_{idx + 1}" for idx in range(expected_count)]
 
     def _mse(self, sample: np.ndarray) -> float:
         sample = sample.reshape(1, -1)
@@ -190,6 +206,88 @@ class AgentDashboard:
 
         st.write(f"Toplam bloklanan IP sayisi: **{len(self.agent.blocked_ips)}**")
 
+    def render_manual_test_panel(self) -> None:
+        st.subheader("Manuel Paket Testi")
+        st.caption(
+            "Kritik ozellikleri manuel girerek tek paket icin anlik MSE ve saldiri kararini test edebilirsiniz. "
+            "Girmediginiz ozellikler test seti medyan degeri ile doldurulur."
+        )
+
+        feature_count = st.slider(
+            "Manuel girilecek kritik ozellik sayisi",
+            min_value=4,
+            max_value=min(12, len(self.top_feature_indices)),
+            value=8,
+            step=1,
+            key="manuel_ozellik_sayisi",
+        )
+
+        manual_sample = self.feature_defaults.copy()
+        selected_indices = self.top_feature_indices[:feature_count]
+        input_keys = [f"manuel_{self.feature_names[int(idx)]}_{int(idx)}" for idx in selected_indices]
+
+        if "manuel_panel_init" not in st.session_state:
+            st.session_state["manuel_panel_init"] = True
+            for idx, key in zip(selected_indices, input_keys):
+                st.session_state[key] = float(np.clip(self.feature_defaults[int(idx)], 0.0, 1.0))
+
+        action_cols = st.columns(3)
+        if action_cols[0].button("Normal ornekten doldur", key="btn_normal_doldur"):
+            normal_indices = np.where(self.test_y == 0)[0]
+            if len(normal_indices) > 0:
+                picked = int(normal_indices[0])
+                for idx, key in zip(selected_indices, input_keys):
+                    st.session_state[key] = float(np.clip(self.test_x[picked, int(idx)], 0.0, 1.0))
+
+        if action_cols[1].button("Saldiri orneginden doldur", key="btn_saldiri_doldur"):
+            attack_indices = np.where(self.test_y == 1)[0]
+            if len(attack_indices) > 0:
+                picked = int(attack_indices[0])
+                for idx, key in zip(selected_indices, input_keys):
+                    st.session_state[key] = float(np.clip(self.test_x[picked, int(idx)], 0.0, 1.0))
+
+        if action_cols[2].button("Alanlari medyana sifirla", key="btn_medyan_sifirla"):
+            for idx, key in zip(selected_indices, input_keys):
+                st.session_state[key] = float(np.clip(self.feature_defaults[int(idx)], 0.0, 1.0))
+
+        columns = st.columns(2)
+
+        for order, (feature_idx, input_key) in enumerate(zip(selected_indices, input_keys)):
+            feature_name = self.feature_names[int(feature_idx)]
+            default_value = float(self.feature_defaults[int(feature_idx)])
+
+            with columns[order % 2]:
+                manual_value = st.number_input(
+                    f"{feature_name}",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=float(np.clip(default_value, 0.0, 1.0)),
+                    step=0.01,
+                    key=input_key,
+                )
+            manual_sample[int(feature_idx)] = manual_value
+
+        apply_block_action = st.checkbox("Saldiri cikarsa bloklama aksiyonunu uygula", value=False, key="manuel_bloklama")
+        manual_ip = st.text_input("Test IP adresi", value="192.168.100.10", key="manuel_ip")
+
+        if st.button("Manuel paketi test et", key="manuel_test_buton"):
+            mse_value = self._mse(manual_sample.astype(np.float32))
+            raw_prediction = int(mse_value > self.agent.threshold)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("MSE", f"{mse_value:.6f}")
+            with col2:
+                st.metric("Aktif Threshold", f"{self.agent.threshold:.6f}")
+
+            if raw_prediction == 1:
+                st.error("Sonuc: SALDIRI ADAYI")
+                if apply_block_action:
+                    block_message = self.agent.block_ip(manual_ip)
+                    st.warning(f"Bloklama sonucu: {block_message}")
+            else:
+                st.success("Sonuc: Guvenli Trafik")
+
 
 def main() -> None:
     st.sidebar.header("Simulasyon Ayarlari")
@@ -226,6 +324,9 @@ def main() -> None:
         dashboard.run_simulation(max_packets=max_packets, delay_seconds=delay_seconds)
     else:
         st.info("Simulasyonu baslatmak icin soldaki butonu kullanin.")
+
+    st.markdown("---")
+    dashboard.render_manual_test_panel()
 
 
 if __name__ == "__main__":
