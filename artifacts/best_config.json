@@ -1,0 +1,13 @@
+{
+  "selection_policy": "recall>=target ise en iyi f1, aksi halde en yuksek recall",
+  "target_recall": 0.8,
+  "base_threshold": 0.00021239913621684536,
+  "best_threshold_scale": 0.95,
+  "best_active_threshold": 0.0002017791794060031,
+  "best_window_size": 1,
+  "best_min_votes": 1,
+  "best_accuracy": 0.8752,
+  "best_precision": 0.852565307273069,
+  "best_recall": 0.9073,
+  "best_f1": 0.8790814843522915
+}

@@ -191,6 +191,31 @@ Bu komut:
 - en iyi ayari secer,
 - `artifacts/evaluation_results.csv` ve `artifacts/best_config.json` dosyalarini uretir.
 
+### 6) sunum icin gorsellestirme ciktilari
+```bash
+python visualize.py
+```
+
+Bu komut:
+- veri oncesi ve veri sonrasi karsilastirma grafiklerini,
+- model cikti skor grafiklerini,
+- threshold tarama performans egrilerini
+
+`artifacts/gorseller/` altinda asamalara gore klasorlenmis sekilde kaydeder:
+- `artifacts/gorseller/ham_veri/`
+- `artifacts/gorseller/model_oncesi/`
+- `artifacts/gorseller/model_sirasi/`
+- `artifacts/gorseller/model_sonrasi/`
+
+Uretilen ciktilar arasinda sunlar bulunur:
+- sinif dagilimi, NaN/Infinity temizlik karsilastirmasi
+- PCA dagilimi, secili ozellik korelasyon matrisi
+- secili ozellikler icin violin ve kutu grafikler
+- test MSE dagilimi, ROC, PR, confusion matrix (adet + oran)
+- threshold tarama egrileri, MSE ECDF, MSE zaman serisi, kumulatif recall
+- MSE icin QQ plot
+- en cok kacirilan saldirilar ve en cok yanlis alarmlar (CSV tablo)
+
 ---
 
 ## 8) yeniden uretilebilirlik ve iyi muhendislik pratikleri
