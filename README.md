@@ -1,274 +1,184 @@
-# cyber security agent - cicids2017 anomali tespiti
+# Siber Güvenlik Ajani: CICIDS2017 Anomali Tespiti
 
-Bu proje, CICIDS2017 veri seti uzerinde **sadece normal trafik ile egitilen** bir `Dense Autoencoder` yaklasimi kullanarak ag trafigindeki saldiri anomalilerini tespit eden ve tespit aninda otonom aksiyon (dummy IP bloklama) alabilen bir siber guvenlik ajani gelistirmek amaciyla hazirlanmistir.
+Bu proje, ağ trafiğindeki siber saldırı anomalilerini tespit etmek ve tespit anında otonom aksiyonlar alabilmek için tasarlanmış bir siber güvenlik ajanıdır. CICIDS2017 veri seti kullanılarak geliştirilen bu ajan, yalnızca normal trafik örnekleri ile eğitilmiş bir Yoğun Otomatik Kodlayıcı (Dense Autoencoder) yaklaşımı benimser. Hedef kullanıcılar, ağ güvenliği analistleri ve araştırmacılardır. Proje, imza tabanlı sistemlerin yetersiz kaldığı bilinmeyen saldırılara karşı bir prototip çözümü sunarken, tespit edilen tehditlere karşı otomatik (simüle edilmiş) IP bloklama yeteneği ile operasyonel bir güvenlik ajanı davranışı sergiler.
 
-> Bu calismada **transfer learning** veya hazir egitilmis mimariler kesinlikle kullanilmamistir. Tum model katmanlari Keras ile sifirdan kurulmustur.
+## İçindekiler
+* [Özet](#özet)
+* [Özellikler](#özellikler)
+* [Gereksinimler](#gereksinimler)
+* [Kurulum ve çalıştırma](#kurulum-ve-çalıştırma)
+* [Yapılandırma](#yapılandırma)
+* [Kullanılan teknolojiler](#kullanılan-teknolojiler)
+* [Mimari ve klasör yapısı](#mimari-ve-klasör-yapısı)
+* [API veya uç noktalar](#api-veya-uç-noktalar)
+* [Test ve kalite](#test-ve-kalite)
+* [Dağıtım ve üretim notları](#dağıtım-ve-üretim-notları)
+* [Katkıda bulunma](#katkıda-bulunma)
+* [Lisans](#lisans)
 
----
+## Özet
+Bu proje, siber güvenlik alanında, özellikle ağ trafiğindeki anomali tespiti problemine odaklanmaktadır. CICIDS2017 veri seti kullanılarak, sadece normal ağ trafiği örnekleri üzerinde eğitilmiş bir Yoğun Otomatik Kodlayıcı (Dense Autoencoder) modeli geliştirilmiştir. Projenin ana hedefi, bu model aracılığıyla ağdaki saldırıları tespit etmek ve tespit anında IP adreslerini bloke etme gibi otonom koruma aksiyonları alabilen bir siber güvenlik ajanı prototipi oluşturmaktır. Ayrıca, sistemin durumu ve tespit edilen anomalilerin interaktif bir gösterge paneli (dashboard) üzerinden gerçek zamanlı olarak izlenebilmesi sağlanmıştır. Bu yaklaşım, hem akademik olarak açıklanabilir bir model sunmakta hem de pratik güvenlik operasyonlarına yönelik bir öncül teşkil etmektedir.
 
-## 1) projenin amaci
+## Özellikler
+*   **Anomali Tabanlı Tespit**: Geleneksel imza tabanlı sistemlerin aksine, bilinmeyen ve varyant saldırıları tespit edebilir.
+*   **Normal Davranış Öğrenimi**: Otomatik Kodlayıcı, sadece normal trafik kalıplarını öğrenerek normalden sapmaları yüksek yeniden üretim hatası (MSE) ile işaretler.
+*   **Otomatik Koruma Aksiyonu**: Saldırı tespit edildiğinde, belirli bir IP adresini bloklama gibi otonom bir koruma eylemi başlatır (gerçek veya dry-run modunda).
+*   **Etkileşimli Gerçek Zamanlı Dashboard**: Streamlit tabanlı modern bir arayüz ile paket akışı, anlık MSE değerleri ve sistem durumu canlı olarak gözlemlenebilir.
+*   **Esnek Eşik Mekanizması**: Modelin performansını dengelemek (F1) veya saldırı yakalama kabiliyetini (recall) önceliklendirmek için optimize edilmiş eşikler kullanılır.
+*   **Çoklu Model ve Tohum Seçimi**: Daha sağlam ve yeniden üretilebilir sonuçlar elde etmek için birden fazla aday model ve farklı rastgele tohum kombinasyonları değerlendirilir.
+*   **Veri Dengeleme Stratejisi**: Sınıf dengesizliğinin önüne geçmek ve modelin adil bir karar sınırı öğrenmesini sağlamak için veri seti dengelenir.
+*   **Açıklanabilir Mimari**: Transfer öğrenimi veya önceden eğitilmiş modeller kullanılmamıştır; tüm model katmanları Keras ile sıfırdan oluşturulmuştur.
+*   **Yapılandırılabilir Karar Mekanizmaları**: Dashboard üzerinden eşik çarpanı ve pencere tabanlı karar filtreleri ayarlanarak ajanın hassasiyeti kontrol edilebilir.
+*   **Sunuma Hazır Görselleştirmeler**: Kapsamlı ön işleme, model skorları ve performans grafikleri (`artifacts/gorseller/` altında) otomatik olarak üretilir.
 
-Geleneksel imza tabanli IDS yaklasimlari, bilinmeyen ve varyant saldirilar karsisinda yetersiz kalabilir. Bu projede hedef:
+## Gereksinimler
+Projenin çalıştırılması için aşağıdaki gereksinimler bulunmaktadır:
 
-- normal davranis kalibini ogrenmek,
-- normalden sapmalari yeniden uretim hatasi (MSE) uzerinden olcmek,
-- esik ustu anomalileri saldiri olarak siniflandirmak,
-- tespit aninda otomatik bir koruma aksiyonu tetiklemek,
-- tum sureci modern bir dashboard ile gozlemlenebilir hale getirmektir.
+*   **Python Sürümü**: Minimum Python 3.10
+*   **Kütüphaneler**:
+    *   `pandas`, `numpy` (veri işleme)
+    *   `scikit-learn` (normalizasyon, metrikler, veri bölme)
+    *   `tensorflow` / `keras` (otomatik kodlayıcı mimarisi)
+    *   `matplotlib`, `seaborn` (grafikler, karmaşıklık matrisi)
+    *   `streamlit` (etkileşimli dashboard arayüzü)
 
-Bu sayede sistem, hem akademik olarak aciklanabilir hem de prototip seviyesinde operasyonel bir guvenlik ajani davranisi sergiler.
+Bu kütüphaneler, `pip install -r requirements.txt` komutu ile kurulacaktır.
 
----
+## Kurulum ve çalıştırma
+Projenin kurulumu ve çalıştırılması için aşağıdaki adımları sırasıyla takip edin:
 
-## 2) kullanilan teknolojiler
-
-- `python 3.10+`
-- `pandas`, `numpy` (veri isleme)
-- `scikit-learn` (normalizasyon, metrikler, split)
-- `tensorflow / keras` (sifirdan autoencoder mimarisi)
-- `matplotlib`, `seaborn` (grafikler ve confusion matrix)
-- `streamlit` (etkilesimli dashboard arayuzu)
-
----
-
-## 3) veri seti ve dengeleme stratejisi
-
-### kaynak veri
-`data/` klasorunde bulunan CICIDS2017 CSV dosyalari icinden **cuma gunu** trafik dosyalari okunur:
-
-- `Friday-WorkingHours-Morning.pcap_ISCX.csv`
-- `Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv`
-- `Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv`
-
-### on isleme adimlari
-`data_preprocessing.py` dosyasi su adimlari uygular:
-
-1. Cuma CSV dosyalarini birlestirme
-2. `NaN`, `+Infinity`, `-Infinity` degerlerini temizleme
-3. Kategorik sutunlari sayisallastirma
-4. Etiketleri binary yapiya donusturme:
-   - `BENIGN -> 0 (Normal)`
-   - `DIGER TUM ETIKETLER -> 1 (Saldiri)`
-5. Veri setini dengeli hale getirme:
-   - `100.000 Normal`
-   - `100.000 Saldiri`
-6. Tum ozelliklerde `MinMaxScaler` ile `[0,1]` araligina olcekleme
-
-### neden dengeleme?
-Sinif dengesizligi, modelin sadece cogunluk sinifina ogrenme kaymasina neden olur. 100k-100k dengeleme ile:
-
-- model egitim ve degerlendirme asamalarinda adil bir karar siniri gorur,
-- precision/recall dengesi iyilesir,
-- threshold optimizasyonu daha anlamli hale gelir.
-
----
-
-## 4) autoencoder mimarisi ve mantigi
-
-`train_autoencoder.py` dosyasinda model sifirdan olusturulur:
-
-- **encoder:** `Dense(128) -> Dropout -> Dense(64) -> Dropout -> Dense(32 latent)`
-- **decoder:** `Dense(64) -> Dropout -> Dense(128) -> Dense(input_dim)`
-- kayip fonksiyonu: `MSE`
-- optimizer: `Adam`
-
-### neden sadece normal veriyle egitim?
-Autoencoder, girdiyi yeniden insa etmeyi ogrenir. Eger sadece normal trafikle egitilirse:
-
-- normal ornekleri dusuk hata ile yeniden uretir,
-- saldiri trafikleri normal dagilimdan saptigi icin yuksek MSE uretir,
-- bu hata farki threshold tabanli anomali tespitini guclendirir.
-
-Bu strateji one-class / semi-supervised anomaly detection paradigmasina uygundur.
-
-### threshold ve model secimi nasil yapiliyor?
-Egitim asamasinda yalnizca tek bir model degil, birden fazla aday model ve farkli seed kombinasyonlari degerlendirilir:
-
-- 3 farkli dense autoencoder adayi egitilir,
-- her aday `3 seed` ile (`42`, `77`, `123`) tekrar edilir,
-- secim politikasi:
-  - once `recall >= 0.80` kosulunu saglayan deneyler filtrelenir,
-  - bu kümeden en yuksek `F1` secilir,
-  - hicbiri kosulu saglamazsa en yuksek `recall` secilir (esitlikte F1).
-
-Threshold tarafinda validation MSE dagilimi uzerinden hem dengeli (F1) hem recall oncelikli (F2) esik hesaplanir. Uretim/simulasyon tarafinda varsayilan olarak recall oncelikli esik kullanilir. Bu esikler:
-
-- `artifacts/threshold.json` dosyasina kaydedilir,
-- dashboard ajaninda karar mekanizmasi olarak kullanilir.
-
-Ayrica validation MSE histogrami:
-
-- `artifacts/validation_mse_distribution.png`
-
-olarak uretilir.
-
----
-
-## 5) otonom ajan ve dashboard ozellikleri
-
-`agent_dashboard.py` dosyasi Streamlit tabanli bir GUI sunar.
-
-### arayuzde bulunan ana moduller
-- canli paket log alani (paket paket simulasyon akisi)
-- anlik MSE cizgi grafigi
-- durum gostergesi:
-  - threshold alti: **guvenli**
-  - threshold ustu: **saldiri tespit edildi - ip bloklaniyor**
-- simulasyon sonu metrik paneli:
-  - Accuracy
-  - Precision
-  - Recall
-  - F1-Score
-  - Confusion Matrix
-- karar paneli:
-  - threshold carpani (recall/precision dengesi icin)
-  - pencere tabanli karar filtresi (opsiyonel)
-
-### otonom tepki mekanizmasi
-Saldiri tespitinde `block_ip()` fonksiyonu tetiklenir. Dashboard tarafinda iki mod desteklenir:
-
-- `dry-run` (varsayilan, guvenli): gercek bloklama yapmaz, calistirilacak firewall komutunu loglar.
-- gercek komut modu: Windows ortaminda `netsh advfirewall`, Linux ortaminda `iptables` komutunu calistirir.
-
-Bu yaklasim, laboratuvar/sunum ortaminda guvenli test imkani saglarken, ihtiyac halinde gercek firewall otomasyonuna gecisi kolaylastirir.
-
----
-
-## 6) klasor yapisi
-
-```text
-DerinProje/
-├─ data/                              # ham veri (git disi)
-├─ artifacts/                         # uretilen ciktilar
-├─ .gitignore
-├─ requirements.txt
-├─ data_preprocessing.py
-├─ train_autoencoder.py
-├─ agent_dashboard.py
-├─ evaluate.py
-└─ README.md
-```
-
----
-
-## 7) kurulum ve calistirma
-
-### 1) bagimliliklar
+### 1) Bağımlılıklar
+Proje bağımlılıklarını yüklemek için `requirements.txt` dosyasını kullanın:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2) veri on isleme
+### 2) Veri Ön İşleme
+CICIDS2017 veri setinin Cuma gününe ait CSV dosyaları (`data/` klasöründe bulunmalıdır) ön işleme tabi tutulur:
 ```bash
 python data_preprocessing.py
 ```
+Bu adım, `artifacts/processed_friday_balanced.csv` ve `artifacts/feature_columns.json` gibi çıktı dosyalarını oluşturur.
 
-### 3) model egitimi ve threshold hesaplama
+### 3) Model Eğitimi ve Eşik Hesaplama
+Otomatik kodlayıcı modelini eğitmek ve anomali tespiti için gerekli eşik değerlerini hesaplamak için:
 ```bash
 python train_autoencoder.py
 ```
+Bu adım, `model.h5`, `artifacts/threshold.json`, `artifacts/test_set.csv` ve `artifacts/validation_mse_distribution.png` dosyalarını üretir.
 
-Bu adim sonunda:
-- `model.h5`
-- `artifacts/threshold.json`
-- `artifacts/test_set.csv`
-- `artifacts/validation_mse_distribution.png`
-
-olusturulur.
-
-### 4) dashboard ajanini baslatma
+### 4) Dashboard Ajanını Başlatma
+Siber güvenlik ajanının interaktif dashboard'unu başlatmak için:
 ```bash
 streamlit run agent_dashboard.py
 ```
+Bu komut, web tarayıcınızda ajanın canlı simülasyon arayüzünü açacaktır.
 
-### 5) otomatik threshold/pencere tuning
+### 5) Otomatik Eşik/Pencere Ayarı Optimizasyonu
+Modelin karar mekanizması için en iyi eşik çarpanı ve pencere ayarlarını otomatik olarak belirlemek için:
 ```bash
 python evaluate.py --target-recall 0.80
 ```
+Bu komut `artifacts/evaluation_results.csv` ve `artifacts/best_config.json` dosyalarını oluşturur.
 
-Bu komut:
-- farkli threshold carpani + pencere kombinasyonlarini tarar,
-- en iyi ayari secer,
-- `artifacts/evaluation_results.csv` ve `artifacts/best_config.json` dosyalarini uretir.
-
-### 6) sunum icin gorsellestirme ciktilari
+### 6) Sunum İçin Görselleştirme Çıktıları
+Proje raporlarında kullanılabilecek çeşitli analiz ve performans görselleştirmelerini üretmek için:
 ```bash
 python visualize.py
 ```
+Bu komut, `artifacts/gorseller/` klasörü altında aşamalara göre düzenlenmiş grafik dosyalarını kaydeder.
 
-Bu komut:
-- veri oncesi ve veri sonrasi karsilastirma grafiklerini,
-- model cikti skor grafiklerini,
-- threshold tarama performans egrilerini
+## Yapılandırma
+Ajanın çalışma zamanı davranışını etkileyen anahtar yapılandırma değişkenleri ve ayarlar aşağıda listelenmiştir. Bu değerler `agent_dashboard.py` üzerinden interaktif olarak değiştirilebilir veya `artifacts/best_config.json`, `artifacts/threshold.json` gibi dosyalardan okunur.
 
-`artifacts/gorseller/` altinda asamalara gore klasorlenmis sekilde kaydeder:
-- `artifacts/gorseller/ham_veri/`
-- `artifacts/gorseller/model_oncesi/`
-- `artifacts/gorseller/model_sirasi/`
-- `artifacts/gorseller/model_sonrasi/`
+| Değişken                  | Açıklama                                                                | Zorunlu      |
+| :------------------------ | :---------------------------------------------------------------------- | :----------- |
+| `threshold_scale`         | Anomali tespit eşiğini belirlemek için kullanılan çarpan.               | Evet         |
+| `decision_window_size`    | Karar vermek için kullanılan paket penceresinin boyutu (son N paket).   | Evet         |
+| `min_attack_votes`        | Pencere içindeki minimum saldırı oyu sayısı (saldırı olarak kabul için). | Evet         |
+| `dry-run`                 | IP bloklama aksiyonlarının gerçek mi yoksa simülasyon mu olacağını belirler. | Evet         |
+| `target_recall`           | Eşik optimizasyonu sırasında hedeflenen minimum recall değeri.          | Evet         |
+| `max_packets`             | Simülasyon sırasında işlenecek maksimum paket sayısı.                   | Evet         |
+| `delay_seconds`           | Paketler arası simülasyon gecikmesi (saniye cinsinden).                 | Evet         |
 
-Uretilen ciktilar arasinda sunlar bulunur:
-- sinif dagilimi, NaN/Infinity temizlik karsilastirmasi
-- PCA dagilimi, secili ozellik korelasyon matrisi
-- secili ozellikler icin violin ve kutu grafikler
-- test MSE dagilimi, ROC, PR, confusion matrix (adet + oran)
-- threshold tarama egrileri, MSE ECDF, MSE zaman serisi, kumulatif recall
-- MSE icin QQ plot
-- en cok kacirilan saldirilar ve en cok yanlis alarmlar (CSV tablo)
+## Kullanılan teknolojiler
+Bu proje, modern veri bilimi ve makine öğrenimi teknolojilerini kullanarak geliştirilmiştir:
 
----
+*   **Programlama Dili**: Python 3.10+
+*   **Veri İşleme**: Pandas, NumPy
+*   **Makine Öğrenimi Çekirdeği**: TensorFlow, Keras
+*   **Veri Bilimi Araçları**: Scikit-learn
+*   **Görselleştirme**: Matplotlib, Seaborn
+*   **Etkileşimli Arayüz**: Streamlit
 
-## 8) yeniden uretilebilirlik ve iyi muhendislik pratikleri
+## Mimari ve klasör yapısı
+Proje, modüler ve anlaşılır bir yapıya sahip olacak şekilde tasarlanmıştır. Çekirdek işlevler, ayrı Python dosyaları ve yardımcı klasörler aracılığıyla organize edilmiştir. `data/` klasörü ham veri setlerini barındırırken, `artifacts/` klasörü model çıktılarını, eşik değerlerini ve işlenmiş veriyi saklar. Ana Python scriptleri `data_preprocessing.py`, `train_autoencoder.py`, `agent_dashboard.py`, `evaluate.py` ve `visualize.py` olarak ayrılmıştır; her biri projenin farklı bir aşamasını veya işlevini temsil eder. Bu ayrım, kodun bakımını ve geliştirilmesini kolaylaştırır.
 
-- rastgelelik kontrolu (`random_state`) sabit tutulmustur.
-- veri sizintisini azaltmak icin egitim yalnizca normal sinifta yapilir.
-- threshold secimi validation tabanli yapilir.
-- model secimi tek kosu yerine coklu aday + coklu seed ile yapilir.
-- kod OOP odakli, moduler ve acik sorumluluklara bolunmustur.
-- model agirliklari ve ham veri dosyalari `.gitignore` ile korunmustur.
+Aşağıda projenin temel klasör ve dosya yapısı açıklanmaktadır:
 
----
+| Bölüm / klasör            | Kısa açıklama                                                                      |
+| :------------------------ | :--------------------------------------------------------------------------------- |
+| `artifacts/`              | Eğitilen model çıktıları, eşik değerleri ve ara sonuçlar burada saklanır.         |
+| `agent_dashboard.py`      | Streamlit tabanlı interaktif siber güvenlik ajanı dashboard uygulamasını içerir.  |
+| `data_preprocessing.py`   | CICIDS2017 veri setini temizleme, dengeleme ve normalleştirme işlemlerini yapar.   |
+| `evaluate.py`             | Modelin karar eşiği ve pencere ayarları için otomatik değerlendirme yapar.         |
+| `train_autoencoder.py`    | Yoğun otomatik kodlayıcı modelini eğitir ve optimal eşik değerlerini hesaplar.     |
+| `visualize.py`            | Veri ve model performansına dair sunuma hazır görselleştirme çıktıları üretir.    |
+| `README.md`               | Proje hakkında genel bilgi, kurulum ve kullanım talimatlarını içerir.              |
+| `best_config.json`        | En iyi karar penceresi ve eşik ayarlarını içeren yapılandırma dosyası.             |
+| `feature_columns.json`    | İşlenmiş veri setindeki özellik sütunlarının listesini içerir.                    |
+| `threshold.json`          | Modelin anomali tespiti için belirlenen eşik değerlerini ve meta verisini içerir. |
 
-## 9) nihai deney sonucu (proje final konfigurasyonu)
+```mermaid
+flowchart TB
+  root_node["Depo"]
+  agent_dashboard["agent_dashboard.py"]
+  artifacts_dir["artifacts"]
+  data_preprocessing["data_preprocessing.py"]
+  evaluate_py["evaluate.py"]
+  train_autoencoder["train_autoencoder.py"]
+  visualize_py["visualize.py"]
+  readme_md["README.md"]
 
-Asagidaki konfigurasyon ile 1000 paketlik test simulasyonunda elde edilen nihai sonuc:
+  root_node --> agent_dashboard
+  root_node --> artifacts_dir
+  root_node --> data_preprocessing
+  root_node --> evaluate_py
+  root_node --> train_autoencoder
+  root_node --> visualize_py
+  root_node --> readme_md
 
-- secili model: `recall_dense`
-- secili seed: `123`
-- threshold stratejisi: `recall_priority`
-- dashboard ayarlari:
-  - threshold carpani: `0.95`
-  - karar penceresi: `1`
-  - pencerede minimum saldiri oyu: `1`
-  - maksimum paket: `1000`
-  - gecikme: `0.01 sn`
+  artifacts_dir --> best_config_json["best_config.json"]
+  artifacts_dir --> feature_columns_json["feature_columns.json"]
+  artifacts_dir --> threshold_json["threshold.json"]
+```
 
-### performans metrikleri
-- Accuracy: `0.8800`
-- Precision: `0.8598`
-- Recall: `0.9137`
-- F1-Score: `0.8859`
+## API veya uç noktalar
+Bu proje, geleneksel bir web API'si sunmamakla birlikte, kullanıcıların ve diğer modüllerin etkileşimde bulunabileceği ana işlevsel birimlere sahiptir:
 
-### confusion matrix
-- TN: `414`
-- FP: `76`
-- FN: `44`
-- TP: `466`
+*   **`/data_preprocessing` (`data_preprocessing.py`)**: Ham veri setini (CICIDS2017 Cuma CSV dosyaları) işleyerek model eğitimi için dengeli ve temizlenmiş bir veri seti üretir.
+*   **`/train_autoencoder` (`train_autoencoder.py`)**: Otomatik kodlayıcı modelini eğitir ve anomali tespiti için optimal eşik değerlerini belirler.
+*   **`/agent_dashboard` (`streamlit run agent_dashboard.py`)**: Gerçek zamanlı simülasyon ve anomali tespiti için Streamlit tabanlı interaktif bir web arayüzü sağlar. Kullanıcılar buradan simülasyonu başlatabilir ve parametreleri ayarlayabilir.
+*   **`/evaluate_configs` (`evaluate.py`)**: Farklı eşik çarpanları ve pencere tabanlı karar kuralları için otomatik bir grid değerlendirmesi yaparak en iyi performans gösteren yapılandırmayı seçer.
+*   **`/visualize_reports` (`visualize.py`)**: Projenin çeşitli aşamaları (ham veri, model öncesi, model sonrası) için detaylı ve sunuma hazır grafikler ile raporlar üretir.
+*   **`FirewallBlocker` (dahili)**: `agent_dashboard.py` içinde yer alan bu modül, tespit edilen saldırılara karşı dry-run veya gerçek komut modunda IP bloklama aksiyonunu simüle eder/gerçekleştirir.
 
-Bu sonuc, saldiri yakalama kabiliyeti (recall) ile yanlis alarm kontrolu (precision) arasinda guclu bir denge saglandigini gostermektedir.
+## Test ve kalite
+Bu depoda, birim testleri (unit tests) veya entegrasyon testleri gibi otomatik test altyapısı doğrudan bulunmamaktadır. `evaluate.py` scripti, farklı model ve eşik ayarlarının performansını değerlendirmek için bir tür hiperparametre taraması ve model seçimi mekanizması sunsa da, bu geleneksel anlamda bir test süreci değildir.
 
----
+Gelecekteki geliştirmeler için aşağıdaki test ve kalite adımlarının eklenmesi önerilir:
+*   **Birim Testleri**: Her bir sınıf (`DataPreprocessor`, `AutoencoderTrainer`, `CyberSecurityAgent` vb.) ve kritik fonksiyonlar için ayrı ayrı birim testleri yazılmalıdır.
+*   **Entegrasyon Testleri**: Farklı modüllerin birbiriyle doğru çalıştığını doğrulamak için entegrasyon testleri eklenmelidir (örneğin, ön işlenmiş verinin model tarafından doğru şekilde tüketilmesi).
+*   **Performans Testleri**: Ajanın gerçek zamanlı paket akışı altında performansını (gecikme, kaynak tüketimi) ölçmek için testler geliştirilmelidir.
+*   **Sürekli Entegrasyon (CI)**: Her kod değişikliğinde otomatik olarak testlerin çalıştırılmasını ve kod kalitesinin kontrol edilmesini sağlayacak bir CI/CD boru hattı kurulması önerilir.
 
-## 10) gelistirme icin sonraki adimlar
+## Dağıtım ve üretim notları
+Bu proje, eğitsel ve araştırma amaçlı bir prototip olarak tasarlanmıştır. Üretim ortamlarında doğrudan kullanmadan önce kapsamlı güvenlik sertleştirmesi, ölçeklenebilirlik testleri ve mavi-takım/kırmızı-takım doğrulamaları yapılması zorunludur.
 
-- gercek zamanli paket yakalama (pcap/socket) entegrasyonu
-- dinamik threshold (zaman pencereli adaptif yapi)
-- SHAP/feature-attribution ile aciklanabilirlik katmani
-- dummy `block_ip()` yerine gercek firewall otomasyonu
-- CI/CD ve test altyapisi (unit + smoke test)
+Ajanın `agent_dashboard.py` içindeki `FirewallBlocker` sınıfı, IP bloklama aksiyonlarını yönetir. Varsayılan olarak **`dry-run`** modu etkindir, bu da gerçek bir firewall komutu çalıştırmak yerine sadece bloklama komutunu logladığı anlamına gelir. Bu, ajanı laboratuvar ortamında veya sunumlar sırasında güvenli bir şekilde test etmek için idealdir. Gerçek bir ortamda kullanılması gerektiğinde, `dry-run` modu devre dışı bırakılarak ajanın Windows ortamında `netsh advfirewall` veya Linux ortamında `iptables` gibi komutları doğrudan çalıştırması sağlanabilir. Bu geçiş, risklerin dikkatlice değerlendirilmesini ve güvenlik politikalarıyla uyumlu olmasını gerektirir. Modelin ve ajanın kararlarının gerçek üretim trafiği üzerinde doğrulanması, yanlış pozitiflerin veya kaçırılan saldırıların potansiyel etkileri göz önüne alındığında kritik öneme sahiptir.
 
----
+## Katkıda bulunma
+Bu proje, araştırma ve eğitim amaçlı bir prototip olduğundan, katkılar açıktır. Herhangi bir hata bulduğunuzda, iyileştirme önerileriniz olduğunda veya yeni özellikler eklemek istediğinizde lütfen bir konu (issue) açmaktan veya bir çekme isteği (pull request) göndermekten çekinmeyin. Kodlama standartlarına ve iyi mühendislik prensiplerine uyan katkılar memnuniyetle karşılanacaktır.
 
-## 11) lisans ve akademik not
-
-Bu repo, bitirme/donem projesi kapsaminda egitsel ve arastirma odakli bir prototip olarak tasarlanmistir. Uretim ortamlarinda dogrudan kullanmadan once guvenlik sertlestirmesi, olceklenebilirlik testleri ve mavi-takim/kirmizi-takim dogrulamalari yapilmalidir.
+## Lisans
+Bu depo, bir bitirme/dönem projesi kapsamında eğitsel ve araştırma odaklı bir prototip olarak tasarlanmıştır. Proje için özel bir lisans dosyası (`LICENSE`) belirtilmemiştir. Bir lisans dosyası eklenmesi önerilir.
